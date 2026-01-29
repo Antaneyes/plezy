@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../focus/focusable_wrapper.dart';
 import '../../i18n/strings.g.dart';
 
 /// Dialog for joining a watch together session
@@ -93,10 +94,13 @@ class _JoinSessionDialogState extends State<JoinSessionDialog> {
                 const SizedBox(height: 24),
 
                 // Join button
-                FilledButton.icon(
-                  onPressed: _join,
-                  icon: const Icon(Symbols.group_add),
-                  label: Text(t.watchTogether.joinSession),
+                FocusableWrapper(
+                  onSelect: _join,
+                  child: FilledButton.icon(
+                    onPressed: _join,
+                    icon: const Icon(Symbols.group_add),
+                    label: Text(t.watchTogether.joinSession),
+                  ),
                 ),
               ],
             ),

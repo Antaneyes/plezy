@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
+import '../../focus/focusable_wrapper.dart';
 import '../../i18n/strings.g.dart';
 import '../../utils/app_logger.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
@@ -93,25 +94,32 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _isCreating || _isJoining ? null : _createSession,
-                  icon: _isCreating
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Symbols.add_rounded),
-                  label: Text(_isCreating ? t.watchTogether.creating : t.watchTogether.createSession),
+              FocusableWrapper(
+                autofocus: true,
+                onSelect: _isCreating || _isJoining ? null : _createSession,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isCreating || _isJoining ? null : _createSession,
+                    icon: _isCreating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Symbols.add_rounded),
+                    label: Text(_isCreating ? t.watchTogether.creating : t.watchTogether.createSession),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isCreating || _isJoining ? null : _joinSession,
-                  icon: _isJoining
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Symbols.group_add_rounded),
-                  label: Text(_isJoining ? t.watchTogether.joining : t.watchTogether.joinSession),
+              FocusableWrapper(
+                onSelect: _isCreating || _isJoining ? null : _joinSession,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isCreating || _isJoining ? null : _joinSession,
+                    icon: _isJoining
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Symbols.group_add_rounded),
+                    label: Text(_isJoining ? t.watchTogether.joining : t.watchTogether.joinSession),
+                  ),
                 ),
               ),
             ],
@@ -317,16 +325,20 @@ class _ActiveSessionContent extends StatelessWidget {
         const SizedBox(height: 24),
 
         // Leave/End Session Button
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _leaveSession(context),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: theme.colorScheme.error,
-              side: BorderSide(color: theme.colorScheme.error),
+        FocusableWrapper(
+          autofocus: true,
+          onSelect: () => _leaveSession(context),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _leaveSession(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+                side: BorderSide(color: theme.colorScheme.error),
+              ),
+              icon: Icon(watchTogether.isHost ? Symbols.close_rounded : Symbols.logout_rounded),
+              label: Text(watchTogether.isHost ? t.watchTogether.endSession : t.watchTogether.leaveSession),
             ),
-            icon: Icon(watchTogether.isHost ? Symbols.close_rounded : Symbols.logout_rounded),
-            label: Text(watchTogether.isHost ? t.watchTogether.endSession : t.watchTogether.leaveSession),
           ),
         ),
       ],
@@ -366,24 +378,28 @@ class _SessionCodeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return InkWell(
-      onTap: () => _copySessionCode(context),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${t.watchTogether.sessionCode}: $sessionId',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
-                color: theme.colorScheme.onSurfaceVariant,
+    return FocusableWrapper(
+      onSelect: () => _copySessionCode(context),
+      borderRadius: 4,
+      child: InkWell(
+        onTap: () => _copySessionCode(context),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${t.watchTogether.sessionCode}: $sessionId',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Symbols.content_copy_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
-          ],
+              const SizedBox(width: 4),
+              Icon(Symbols.content_copy_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
