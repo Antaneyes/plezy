@@ -419,10 +419,19 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
   }
 
   KeyEventResult _handleBackKey(KeyEvent event) {
-    // Toggle focus between sidebar and content on BACK key
+    // On TV: BACK from sidebar exits the app, BACK from content goes to sidebar
     return handleBackKeyAction(event, () {
       if (_isSidebarFocused) {
-        _focusContent();
+        // Exit the app when pressing BACK from sidebar on TV
+        if (PlatformDetector.isTV()) {
+          if (Platform.isAndroid) {
+            // On Android TV, pop the route to exit
+            Navigator.of(context).maybePop();
+          }
+        } else {
+          // On desktop, toggle to content
+          _focusContent();
+        }
       } else {
         _focusSidebar();
       }
@@ -610,11 +619,9 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
               : SideNavigationRailState.collapsedWidth;
 
           return PopScope(
-            canPop: false, // Prevent system back from popping on Android TV
+            canPop: PlatformDetector.isTV() && _isSidebarFocused, // Allow exit from sidebar on TV
             onPopInvokedWithResult: (didPop, result) {
-              // No-op: back key events bubble through widget tree and are handled
-              // by content screens (e.g., LibrariesScreen) or MainScreen's _handleBackKey.
-              // We only use PopScope to prevent the system from popping the route.
+              // No-op: back key events bubble through widget tree...
             },
             child: Focus(
               onKeyEvent: (node, event) => _handleBackKey(event),

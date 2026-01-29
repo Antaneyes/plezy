@@ -9,6 +9,7 @@ import 'profile_list_tile.dart';
 import '../../widgets/desktop_app_bar.dart';
 import '../libraries/state_messages.dart';
 import '../../i18n/strings.g.dart';
+import '../../focus/focusable_wrapper.dart';
 
 class ProfileSwitchScreen extends StatelessWidget {
   const ProfileSwitchScreen({super.key});
@@ -41,11 +42,15 @@ class ProfileSwitchScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            userProvider.refreshCurrentUser();
-                          },
-                          child: Text(t.common.retry),
+                        FocusableWrapper(
+                          autofocus: true,
+                          onSelect: () => userProvider.refreshCurrentUser(),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              userProvider.refreshCurrentUser();
+                            },
+                            child: Text(t.common.retry),
+                          ),
                         ),
                       ],
                     ),
@@ -70,10 +75,14 @@ class ProfileSwitchScreen extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Card(
-                        child: ProfileListTile(
-                          user: user,
-                          isCurrentUser: isCurrentUser,
-                          onTap: () => _switchToUser(context, user),
+                        child: FocusableWrapper(
+                          autofocus: index == 0,
+                          onSelect: isCurrentUser ? null : () => _switchToUser(context, user),
+                          child: ProfileListTile(
+                            user: user,
+                            isCurrentUser: isCurrentUser,
+                            onTap: () => _switchToUser(context, user),
+                          ),
                         ),
                       ),
                     );

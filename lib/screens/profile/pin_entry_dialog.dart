@@ -3,6 +3,8 @@ import 'package:plezy/widgets/app_icon.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import '../../i18n/strings.g.dart';
+import '../../utils/platform_detector.dart';
+import '../../focus/focusable_wrapper.dart';
 
 /// Dialog for entering a PIN to access a protected profile
 class PinEntryDialog extends StatefulWidget {
@@ -40,7 +42,14 @@ class _PinEntryDialogState extends State<PinEntryDialog> with SingleTickerProvid
 
     // Auto-focus the PIN field when dialog opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
+      if (PlatformDetector.isTV()) {
+        // Delay focus on TV to ensure dialog is rendered and keyboard triggers
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) _focusNode.requestFocus();
+        });
+      } else {
+        _focusNode.requestFocus();
+      }
 
       // If there's an error message, trigger shake and clear field
       if (widget.errorMessage != null) {
@@ -91,14 +100,15 @@ class _PinEntryDialogState extends State<PinEntryDialog> with SingleTickerProvid
               controller: _pinController,
               focusNode: _focusNode,
               obscureText: _obscureText,
-              keyboardType: TextInputType.number,
+              // Force number/phone keyboard for TV remote compatibility
+              keyboardType: PlatformDetector.isTV() ? TextInputType.number : TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
               decoration: InputDecoration(
                 hintText: t.pinEntry.enterPin,
                 border: const OutlineInputBorder(),
                 errorText: widget.errorMessage,
                 errorMaxLines: 2,
-                suffixIcon: IconButton(
+                suffixIcon: !PlatformDetector.isTV() ? IconButton(
                   icon: AppIcon(
                     _obscureText ? Symbols.visibility_off_rounded : Symbols.visibility_rounded,
                     fill: 1,
@@ -110,15 +120,21 @@ class _PinEntryDialogState extends State<PinEntryDialog> with SingleTickerProvid
                     });
                   },
                   tooltip: _obscureText ? t.pinEntry.showPin : t.pinEntry.hidePin,
-                ),
+                ) : null,
               ),
               onSubmitted: (_) => _submit(),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(null), child: Text(t.common.cancel)),
-          FilledButton(onPressed: _submit, child: Text(t.common.submit)),
+          FocusableWrapper(
+            onSelect: () => Navigator.of(context).pop(null),
+            child: TextButton(onPressed: () => Navigator.of(context).pop(null), child: Text(t.common.cancel)),
+          ),
+          FocusableWrapper(
+            onSelect: _submit,
+            child: FilledButton(onPressed: _submit, child: Text(t.common.submit)),
+          ),
         ],
       ),
     );
