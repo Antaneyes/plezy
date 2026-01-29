@@ -49,12 +49,14 @@ android {
 
     buildTypes {
         release {
-            // Only use release signing if key.properties exists (not in CI/CD)
+            // Use release signing if key.properties exists, otherwise fallback to debug signing
+            // so the APK remains installable even in CI builds
             val keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
-            // If key.properties doesn't exist, it will use debug signing for CI builds
         }
     }
 
