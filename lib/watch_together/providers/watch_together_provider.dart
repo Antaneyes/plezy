@@ -37,6 +37,11 @@ class WatchTogetherProvider with ChangeNotifier {
     return '${adjectives[random.nextInt(adjectives.length)]} ${nouns[random.nextInt(nouns.length)]}';
   }
 
+  /// Generate a random session ID
+  static String generateRandomSessionId() {
+    return const Uuid().v4().substring(0, 8).toUpperCase();
+  }
+
   /// Callback for when host switches media (guests should navigate)
   /// Used by MainScreen when VideoPlayerScreen is not active
   MediaSwitchCallback? onMediaSwitched;
@@ -90,6 +95,8 @@ class WatchTogetherProvider with ChangeNotifier {
     String? mediaRatingKey,
     String? mediaServerId,
     String? mediaTitle,
+    String? customSessionId,
+    String? customDisplayName,
   }) async {
     // Clean up any existing session
     await leaveSession();
@@ -100,7 +107,7 @@ class WatchTogetherProvider with ChangeNotifier {
     _setupPeerServiceListeners();
 
     try {
-      final sessionId = await _peerService!.createSession();
+      final sessionId = await _peerService!.createSession(customId: customSessionId);
 
       _session = WatchSession.createAsHost(
         sessionId: sessionId,
@@ -111,8 +118,8 @@ class WatchTogetherProvider with ChangeNotifier {
         mediaTitle: mediaTitle,
       ).copyWith(state: SessionState.connected);
 
-      // Generate a random display name and add self to participants
-      _displayName = _generateDisplayName();
+      // Use custom display name or generate a random one
+      _displayName = customDisplayName ?? _generateDisplayName();
       _participants.add(Participant(peerId: _peerService!.myPeerId!, displayName: _displayName, isHost: true));
 
       _syncManager = WatchTogetherSyncManager(
@@ -136,7 +143,7 @@ class WatchTogetherProvider with ChangeNotifier {
   }
 
   /// Join an existing session as guest
-  Future<void> joinSession(String sessionId) async {
+  Future<void> joinSession(String sessionId, {String? customDisplayName}) async {
     // Clean up any existing session
     await leaveSession();
 
@@ -154,8 +161,8 @@ class WatchTogetherProvider with ChangeNotifier {
       // Session will be fully configured when we receive sessionConfig from host
       _session = _session!.copyWith(state: SessionState.connected, hostPeerId: 'wt-${sessionId.toUpperCase()}');
 
-      // Generate a random display name for this session
-      _displayName = _generateDisplayName();
+      // Use custom display name or generate a random one
+      _displayName = customDisplayName ?? _generateDisplayName();
 
       _syncManager = WatchTogetherSyncManager(
         peerService: _peerService!,

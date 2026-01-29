@@ -10,6 +10,7 @@ import '../../widgets/focused_scroll_scaffold.dart';
 import '../models/watch_session.dart';
 import '../providers/watch_together_provider.dart';
 import '../widgets/join_session_dialog.dart';
+import '../../providers/user_profile_provider.dart';
 
 /// Main screen for Watch Together functionality
 ///
@@ -130,13 +131,58 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
   }
 
   Future<void> _createSession() async {
+    final theme = Theme.of(context);
+    final userProvider = Provider.of<UserProfileProvider>(context, listen: false);
+    final userName = userProvider.currentUser?.title ?? userProvider.home?.users.firstWhere((u) => u.id == userProvider.currentUser?.id).title;
+    
+    // Choose session code dialog
+    final codeController = TextEditingController(text: WatchTogetherProvider.generateRandomSessionId());
+    final customSessionId = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.watchTogether.createSession),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.watchTogether.sessionCode, style: theme.textTheme.labelMedium),
+            const SizedBox(height: 8),
+            TextField(
+              controller: codeController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 8,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                UpperCaseTextFormatter(),
+              ],
+              decoration: const OutlineInputBorder().decoration,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(t.common.cancel)),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, codeController.text),
+            child: Text(t.common.submit),
+          ),
+        ],
+      ),
+    );
+
+    if (customSessionId == null || !mounted) return;
+
     final controlMode = await _showControlModeDialog();
     if (controlMode == null || !mounted) return;
 
     setState(() => _isCreating = true);
 
     try {
-      await widget.watchTogether.createSession(controlMode: controlMode);
+      await widget.watchTogether.createSession(
+        controlMode: controlMode,
+        customSessionId: customSessionId,
+        customDisplayName: userName,
+      );
     } catch (e) {
       appLogger.e('Failed to create session', error: e);
       if (mounted) {
@@ -171,13 +217,16 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
   }
 
   Future<void> _joinSession() async {
+    final userProvider = Provider.of<UserProfileProvider>(context, listen: false);
+    final userName = userProvider.currentUser?.title;
+
     final sessionId = await showJoinSessionDialog(context);
     if (sessionId == null || !mounted) return;
 
     setState(() => _isJoining = true);
 
     try {
-      await widget.watchTogether.joinSession(sessionId);
+      await widget.watchTogether.joinSession(sessionId, customDisplayName: userName);
     } catch (e) {
       appLogger.e('Failed to join session', error: e);
       if (mounted) {

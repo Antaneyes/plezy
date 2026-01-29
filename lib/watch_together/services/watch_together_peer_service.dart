@@ -119,13 +119,13 @@ class WatchTogetherPeerService {
   /// Create a new session as host
   ///
   /// Returns the session ID that others can use to join
-  Future<String> createSession() async {
+  Future<String> createSession({String? customId}) async {
     if (_peer != null) {
       await disconnect();
     }
 
     _isHost = true;
-    _sessionId = _generateSessionId();
+    _sessionId = customId?.toUpperCase() ?? _generateSessionId();
     _reconnectAttempts = 0;
 
     // Create peer with session ID as the peer ID so guests can connect directly
