@@ -34,11 +34,11 @@ jobs:
       run: dart run build_runner build --delete-conflicting-outputs
       
     - name: Build APK
-      run: flutter build apk --release
+      run: flutter build apk --debug
       
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: plezy-android-tv-fix
-        path: build/app/outputs/flutter-apk/app-release.apk
+        name: plezy-tv-debug-test
+        path: build/app/outputs/flutter-apk/app-debug.apk
         retention-days: 30
