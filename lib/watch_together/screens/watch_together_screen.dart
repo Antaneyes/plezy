@@ -156,7 +156,9 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
                 FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
                 UpperCaseTextFormatter(),
               ],
-              decoration: const OutlineInputBorder().decoration,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
             ),
           ],
         ),
