@@ -141,9 +141,29 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
         _contentFocusScope.requestFocus();
       }
 
+      // Register for Watch Together invitations if online
+      _registerWatchTogether();
+
       // Check for updates on startup
       _checkForUpdatesOnStartup();
     });
+  }
+
+  /// Helper to register the current user for Watch Together invitations
+  void _registerWatchTogether() {
+    if (_isOffline) return;
+    try {
+      final userProfile = context.read<UserProfileProvider>();
+      final currentUser = userProfile.currentUser;
+      if (currentUser != null) {
+        context.read<WatchTogetherProvider>().registerForInvitations(
+              userUUID: currentUser.uuid,
+              displayName: currentUser.displayName,
+            );
+      }
+    } catch (e) {
+      appLogger.w('Failed to register for Watch Together invitations', error: e);
+    }
   }
 
   Future<void> _checkForUpdatesOnStartup() async {
@@ -462,6 +482,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
       final userProfileProvider = context.userProfile;
       userProfileProvider.initialize().then((_) {
         userProfileProvider.setDataInvalidationCallback(_invalidateAllScreens);
+        _registerWatchTogether();
       });
     }
   }
@@ -585,6 +606,9 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
     if (_discoverKey.currentState case final FullRefreshable refreshable) {
       refreshable.fullRefresh();
     }
+
+    // Re-register for Watch Together with the new profile data
+    _registerWatchTogether();
 
     // Full refresh libraries screen (clear filters and reload for new profile)
     if (_librariesKey.currentState case final FullRefreshable refreshable) {
