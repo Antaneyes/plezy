@@ -23,6 +23,7 @@ import '../providers/playback_state_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/offline_watch_sync_service.dart';
 import '../providers/offline_mode_provider.dart';
+import '../providers/user_profile_provider.dart';
 import '../services/plex_auth_service.dart';
 import '../services/storage_service.dart';
 import '../utils/desktop_window_padding.dart';
