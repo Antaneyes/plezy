@@ -4,10 +4,12 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../i18n/strings.g.dart';
+import '../../models/plex_friend.dart';
 import '../../utils/app_logger.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
 import '../models/watch_session.dart';
 import '../providers/watch_together_provider.dart';
+import '../widgets/friend_selection_sheet.dart';
 import '../widgets/join_session_dialog.dart';
 
 /// Main screen for Watch Together functionality
@@ -130,6 +132,14 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
 
     try {
       await widget.watchTogether.createSession(controlMode: controlMode);
+
+      // Show friend selection sheet after session is created
+      if (mounted) {
+        await showFriendSelectionSheet(
+          context,
+          onFriendsSelected: (friends) => _inviteFriends(friends),
+        );
+      }
     } catch (e) {
       appLogger.e('Failed to create session', error: e);
       if (mounted) {
@@ -139,6 +149,21 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
       if (mounted) {
         setState(() => _isCreating = false);
       }
+    }
+  }
+
+  void _inviteFriends(List<PlexFriend> friends) {
+    if (friends.isEmpty) return;
+
+    widget.watchTogether.inviteFriends(
+      friends: friends,
+      mediaTitle: widget.watchTogether.currentMediaTitle ?? 'Watch Together Session',
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.watchTogether.invite}: ${friends.length} ${t.watchTogether.inviteFriends.toLowerCase()}')),
+      );
     }
   }
 
@@ -315,13 +340,86 @@ class _ActiveSessionContent extends StatelessWidget {
           ),
         ),
 
+        // Invited Friends Card (host only, if any)
+        if (watchTogether.isHost && watchTogether.invitedFriends.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Symbols.send_rounded, color: theme.colorScheme.secondary),
+                      const SizedBox(width: 12),
+                      Text(t.watchTogether.inviteFriends, style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...watchTogether.invitedFriends.entries.map(
+                    (entry) {
+                      final status = entry.value;
+                      final statusColor = status == 'accepted'
+                          ? Colors.green
+                          : status == 'declined'
+                              ? Colors.red
+                              : theme.colorScheme.onSurfaceVariant;
+                      final statusText = status == 'accepted'
+                          ? t.watchTogether.invitationAccepted
+                          : status == 'declined'
+                              ? t.watchTogether.invitationDeclined
+                              : t.watchTogether.invitationPending;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(Symbols.person_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(entry.key, style: theme.textTheme.bodyMedium)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: theme.textTheme.labelSmall?.copyWith(color: statusColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+
         const SizedBox(height: 24),
+
+        // Invite Friends Button (host only)
+        if (watchTogether.isHost) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: () => _showInviteFriends(context),
+              icon: const Icon(Symbols.person_add_rounded),
+              label: Text(t.watchTogether.inviteFriends),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // Leave/End Session Button
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            autofocus: true,
+            autofocus: !watchTogether.isHost,
             onPressed: () => _leaveSession(context),
             style: OutlinedButton.styleFrom(
               foregroundColor: theme.colorScheme.error,
@@ -332,6 +430,24 @@ class _ActiveSessionContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showInviteFriends(BuildContext context) {
+    showFriendSelectionSheet(
+      context,
+      onFriendsSelected: (friends) {
+        if (friends.isEmpty) return;
+
+        watchTogether.inviteFriends(
+          friends: friends,
+          mediaTitle: watchTogether.currentMediaTitle ?? 'Watch Together Session',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.watchTogether.invite}: ${friends.length}')),
+        );
+      },
     );
   }
 

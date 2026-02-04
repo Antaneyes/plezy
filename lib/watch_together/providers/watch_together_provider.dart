@@ -3,15 +3,20 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../models/plex_friend.dart';
 import '../../mpv/mpv.dart';
 import '../../utils/app_logger.dart';
 import '../models/sync_message.dart';
+import '../models/watch_invitation.dart';
 import '../models/watch_session.dart';
 import '../services/watch_together_peer_service.dart';
 import '../services/watch_together_sync_manager.dart';
 
 /// Callback type for when media switches (for guest navigation)
 typedef MediaSwitchCallback = void Function(String ratingKey, String serverId, String mediaTitle);
+
+/// Callback type for when an invitation is received
+typedef InvitationReceivedCallback = void Function(WatchInvitation invitation);
 
 /// Provider for Watch Together functionality
 ///
@@ -28,6 +33,14 @@ class WatchTogetherProvider with ChangeNotifier {
   final List<Participant> _participants = [];
   bool _isSyncing = false;
   String _displayName = 'User';
+
+  // Invitation state
+  final List<WatchInvitation> _pendingInvitations = [];
+  String? _registeredUserUUID;
+  String? _registeredUserDisplayName;
+
+  // Invited friends tracking (for UI)
+  final Map<String, String> _invitedFriends = {}; // uuid -> status (pending, accepted, declined)
 
   /// Generate a random display name for this session
   static String _generateDisplayName() {
@@ -48,11 +61,20 @@ class WatchTogetherProvider with ChangeNotifier {
   /// Callback for when host exits the video player (guests should exit too)
   VoidCallback? onHostExitedPlayer;
 
+  /// Callback for when an invitation is received
+  InvitationReceivedCallback? onInvitationReceived;
+
   // Stream subscriptions
   StreamSubscription<String>? _peerConnectedSubscription;
   StreamSubscription<String>? _peerDisconnectedSubscription;
   StreamSubscription<SyncMessage>? _messageSubscription;
   StreamSubscription<PeerError>? _errorSubscription;
+
+  // Invitation stream subscriptions
+  StreamSubscription<WatchInvitation>? _invitationReceivedSubscription;
+  StreamSubscription<List<WatchInvitation>>? _invitationsListSubscription;
+  StreamSubscription<Map<String, String>>? _inviteAcceptedSubscription;
+  StreamSubscription<Map<String, String>>? _inviteDeclinedSubscription;
 
   // Getters
   bool get isInSession => _session != null && _session!.state != SessionState.disconnected;
@@ -70,6 +92,13 @@ class WatchTogetherProvider with ChangeNotifier {
   String? get currentMediaRatingKey => _session?.mediaRatingKey;
   String? get currentMediaServerId => _session?.mediaServerId;
   String? get currentMediaTitle => _session?.mediaTitle;
+
+  // Invitation getters
+  List<WatchInvitation> get pendingInvitations => List.unmodifiable(_pendingInvitations);
+  int get pendingInvitationsCount => _pendingInvitations.length;
+  bool get hasPendingInvitations => _pendingInvitations.isNotEmpty;
+  Map<String, String> get invitedFriends => Map.unmodifiable(_invitedFriends);
+  bool get isRegisteredForInvitations => _registeredUserUUID != null;
 
   /// Set the display name for this user
   void setDisplayName(String name) {
@@ -207,6 +236,17 @@ class WatchTogetherProvider with ChangeNotifier {
     _messageSubscription = null;
     _errorSubscription = null;
 
+    // Clean up invitation subscriptions
+    _invitationReceivedSubscription?.cancel();
+    _invitationsListSubscription?.cancel();
+    _inviteAcceptedSubscription?.cancel();
+    _inviteDeclinedSubscription?.cancel();
+
+    _invitationReceivedSubscription = null;
+    _invitationsListSubscription = null;
+    _inviteAcceptedSubscription = null;
+    _inviteDeclinedSubscription = null;
+
     // Clean up services
     _syncManager?.dispose();
     _syncManager = null;
@@ -218,6 +258,7 @@ class WatchTogetherProvider with ChangeNotifier {
     _session = null;
     _participants.clear();
     _isSyncing = false;
+    _clearInvitedFriends();
 
     notifyListeners();
     appLogger.d('WatchTogether: Session left');
@@ -384,6 +425,144 @@ class WatchTogetherProvider with ChangeNotifier {
     if (_session == null) return true; // Not in session, can control
     if (_session!.controlMode == ControlMode.anyone) return true;
     return isHost;
+  }
+
+  // ========== Invitation Methods ==========
+
+  /// Register for receiving invitations.
+  /// Call this when the app starts or when user logs in.
+  Future<void> registerForInvitations({
+    required String userUUID,
+    required String displayName,
+  }) async {
+    _registeredUserUUID = userUUID;
+    _registeredUserDisplayName = displayName;
+
+    // Create peer service if not exists
+    _peerService ??= WatchTogetherPeerService();
+
+    // Set up invitation listeners
+    _setupInvitationListeners();
+
+    try {
+      await _peerService!.registerUser(userUUID);
+      appLogger.d('WatchTogether: Registered for invitations as $displayName ($userUUID)');
+    } catch (e) {
+      appLogger.e('WatchTogether: Failed to register for invitations', error: e);
+      rethrow;
+    }
+  }
+
+  /// Set up listeners for invitation events
+  void _setupInvitationListeners() {
+    _invitationReceivedSubscription?.cancel();
+    _invitationsListSubscription?.cancel();
+    _inviteAcceptedSubscription?.cancel();
+    _inviteDeclinedSubscription?.cancel();
+
+    _invitationReceivedSubscription = _peerService!.onInvitationReceived.listen((invitation) {
+      appLogger.d('WatchTogether: Invitation received from ${invitation.hostDisplayName}');
+      _pendingInvitations.add(invitation);
+      notifyListeners();
+      onInvitationReceived?.call(invitation);
+    });
+
+    _invitationsListSubscription = _peerService!.onInvitationsList.listen((invitations) {
+      appLogger.d('WatchTogether: Received ${invitations.length} pending invitations');
+      _pendingInvitations.clear();
+      _pendingInvitations.addAll(invitations.where((inv) => !inv.isExpired));
+      notifyListeners();
+    });
+
+    _inviteAcceptedSubscription = _peerService!.onInviteAccepted.listen((data) {
+      final userUUID = data['userUUID'] ?? '';
+      final displayName = data['displayName'] ?? 'Unknown';
+      appLogger.d('WatchTogether: Friend $displayName accepted invitation');
+      _invitedFriends[userUUID] = 'accepted';
+      notifyListeners();
+    });
+
+    _inviteDeclinedSubscription = _peerService!.onInviteDeclined.listen((data) {
+      final userUUID = data['userUUID'] ?? '';
+      final displayName = data['displayName'] ?? 'Unknown';
+      appLogger.d('WatchTogether: Friend $displayName declined invitation');
+      _invitedFriends[userUUID] = 'declined';
+      notifyListeners();
+    });
+  }
+
+  /// Invite friends to the current session.
+  /// Must have an active session (call createSession first).
+  void inviteFriends({
+    required List<PlexFriend> friends,
+    required String mediaTitle,
+    String? mediaThumb,
+  }) {
+    if (_session == null || _peerService == null || _registeredUserUUID == null) {
+      appLogger.e('WatchTogether: Cannot invite friends - no active session or not registered');
+      return;
+    }
+
+    for (final friend in friends) {
+      _peerService!.sendInvitation(
+        targetUserUUID: friend.uuid,
+        displayName: _registeredUserDisplayName ?? _displayName,
+        mediaTitle: mediaTitle,
+        mediaThumb: mediaThumb,
+      );
+      _invitedFriends[friend.uuid] = 'pending';
+    }
+
+    notifyListeners();
+    appLogger.d('WatchTogether: Invited ${friends.length} friends to session');
+  }
+
+  /// Accept an invitation and join the session.
+  Future<void> acceptInvitation(WatchInvitation invitation) async {
+    if (_registeredUserUUID == null) {
+      appLogger.e('WatchTogether: Cannot accept invitation - not registered');
+      return;
+    }
+
+    // Notify server of acceptance
+    _peerService?.acceptInvitation(
+      invitation.sessionId,
+      displayName: _registeredUserDisplayName,
+    );
+
+    // Remove from pending
+    _pendingInvitations.removeWhere((inv) => inv.sessionId == invitation.sessionId);
+    notifyListeners();
+
+    // Join the session
+    await joinSession(invitation.sessionId);
+  }
+
+  /// Decline an invitation.
+  void declineInvitation(WatchInvitation invitation) {
+    if (_registeredUserUUID == null) {
+      appLogger.e('WatchTogether: Cannot decline invitation - not registered');
+      return;
+    }
+
+    _peerService?.declineInvitation(
+      invitation.sessionId,
+      displayName: _registeredUserDisplayName,
+    );
+
+    _pendingInvitations.removeWhere((inv) => inv.sessionId == invitation.sessionId);
+    notifyListeners();
+    appLogger.d('WatchTogether: Declined invitation for session ${invitation.sessionId}');
+  }
+
+  /// Get the invitation status for a friend.
+  String? getInvitationStatus(String friendUUID) {
+    return _invitedFriends[friendUUID];
+  }
+
+  /// Clear invited friends tracking (call when session ends).
+  void _clearInvitedFriends() {
+    _invitedFriends.clear();
   }
 
   /// Set the current media (host only) and broadcast to guests

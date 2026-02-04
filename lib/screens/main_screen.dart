@@ -36,6 +36,7 @@ import 'settings/settings_screen.dart';
 import 'video_player_screen.dart';
 import '../services/watch_next_service.dart';
 import '../watch_together/watch_together.dart';
+import '../watch_together/models/watch_invitation.dart';
 
 /// Provides access to the main screen's focus control.
 class MainScreenFocusScope extends InheritedWidget {
@@ -232,9 +233,31 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
           navigator.pop();
         }
       };
+      // Set up invitation received callback
+      watchTogether.onInvitationReceived = (invitation) {
+        appLogger.d('WatchTogether: Invitation received from ${invitation.hostDisplayName}');
+        if (!mounted) return;
+        _showInvitationSnackbar(invitation);
+      };
     } catch (e) {
       appLogger.w('Could not set up Watch Together callback', error: e);
     }
+  }
+
+  void _showInvitationSnackbar(WatchInvitation invitation) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${invitation.hostDisplayName} ${t.watchTogether.invitesYouToWatch(name: '').trim()}: ${invitation.mediaTitle}'),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: t.watchTogether.joinNow,
+          onPressed: () async {
+            final watchTogether = context.read<WatchTogetherProvider>();
+            await watchTogether.acceptInvitation(invitation);
+          },
+        ),
+      ),
+    );
   }
 
   /// Set up Watch Next deep link handling for Android TV launcher taps
