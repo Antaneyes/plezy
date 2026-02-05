@@ -359,7 +359,9 @@ class _ActiveSessionContent extends StatelessWidget {
                   const SizedBox(height: 12),
                   ...watchTogether.invitedFriends.entries.map(
                     (entry) {
-                      final status = entry.value;
+                      final friendData = entry.value;
+                      final status = friendData.status;
+                      final friendName = friendData.name;
                       final statusColor = status == 'accepted'
                           ? Colors.green
                           : status == 'declined'
@@ -377,7 +379,7 @@ class _ActiveSessionContent extends StatelessWidget {
                           children: [
                             Icon(Symbols.person_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                             const SizedBox(width: 12),
-                            Expanded(child: Text(entry.key, style: theme.textTheme.bodyMedium)),
+                            Expanded(child: Text(friendName, style: theme.textTheme.bodyMedium)),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(

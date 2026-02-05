@@ -40,7 +40,8 @@ class WatchTogetherProvider with ChangeNotifier {
   String? _registeredUserDisplayName;
 
   // Invited friends tracking (for UI)
-  final Map<String, String> _invitedFriends = {}; // uuid -> status (pending, accepted, declined)
+  // uuid -> (displayName, status)
+  final Map<String, ({String name, String status})> _invitedFriends = {};
 
   /// Generate a random display name for this session
   static String _generateDisplayName() {
@@ -97,7 +98,7 @@ class WatchTogetherProvider with ChangeNotifier {
   List<WatchInvitation> get pendingInvitations => List.unmodifiable(_pendingInvitations);
   int get pendingInvitationsCount => _pendingInvitations.length;
   bool get hasPendingInvitations => _pendingInvitations.isNotEmpty;
-  Map<String, String> get invitedFriends => Map.unmodifiable(_invitedFriends);
+  Map<String, ({String name, String status})> get invitedFriends => Map.unmodifiable(_invitedFriends);
   bool get isRegisteredForInvitations => _registeredUserUUID != null;
 
   /// Set the display name for this user
@@ -478,7 +479,8 @@ class WatchTogetherProvider with ChangeNotifier {
       final userUUID = data['userUUID'] ?? '';
       final displayName = data['displayName'] ?? 'Unknown';
       appLogger.d('WatchTogether: Friend $displayName accepted invitation');
-      _invitedFriends[userUUID] = 'accepted';
+      final existing = _invitedFriends[userUUID];
+      _invitedFriends[userUUID] = (name: existing?.name ?? displayName, status: 'accepted');
       notifyListeners();
     });
 
@@ -486,7 +488,8 @@ class WatchTogetherProvider with ChangeNotifier {
       final userUUID = data['userUUID'] ?? '';
       final displayName = data['displayName'] ?? 'Unknown';
       appLogger.d('WatchTogether: Friend $displayName declined invitation');
-      _invitedFriends[userUUID] = 'declined';
+      final existing = _invitedFriends[userUUID];
+      _invitedFriends[userUUID] = (name: existing?.name ?? displayName, status: 'declined');
       notifyListeners();
     });
   }
@@ -510,7 +513,7 @@ class WatchTogetherProvider with ChangeNotifier {
         mediaTitle: mediaTitle,
         mediaThumb: mediaThumb,
       );
-      _invitedFriends[friend.uuid] = 'pending';
+      _invitedFriends[friend.uuid] = (name: friend.displayName, status: 'pending');
     }
 
     notifyListeners();
@@ -557,7 +560,7 @@ class WatchTogetherProvider with ChangeNotifier {
 
   /// Get the invitation status for a friend.
   String? getInvitationStatus(String friendUUID) {
-    return _invitedFriends[friendUUID];
+    return _invitedFriends[friendUUID]?.status;
   }
 
   /// Clear invited friends tracking (call when session ends).

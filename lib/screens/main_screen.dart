@@ -38,6 +38,8 @@ import 'video_player_screen.dart';
 import '../services/watch_next_service.dart';
 import '../watch_together/watch_together.dart';
 import '../watch_together/models/watch_invitation.dart';
+import '../watch_together/widgets/invitation_banner.dart';
+import '../watch_together/widgets/invitations_indicator.dart';
 
 /// Provides access to the main screen's focus control.
 class MainScreenFocusScope extends InheritedWidget {
@@ -100,6 +102,9 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
   final FocusScopeNode _sidebarFocusScope = FocusScopeNode(debugLabel: 'Sidebar');
   final FocusScopeNode _contentFocusScope = FocusScopeNode(debugLabel: 'Content');
   bool _isSidebarFocused = false;
+
+  // Current invitation to display as banner
+  WatchInvitation? _currentInvitation;
 
   @override
   void initState() {
@@ -258,27 +263,41 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
       watchTogether.onInvitationReceived = (invitation) {
         appLogger.d('WatchTogether: Invitation received from ${invitation.hostDisplayName}');
         if (!mounted) return;
-        _showInvitationSnackbar(invitation);
+        _showInvitationBanner(invitation);
       };
     } catch (e) {
       appLogger.w('Could not set up Watch Together callback', error: e);
     }
   }
 
-  void _showInvitationSnackbar(WatchInvitation invitation) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${invitation.hostDisplayName} ${t.watchTogether.invitesYouToWatch(name: '').trim()}: ${invitation.mediaTitle}'),
-        duration: const Duration(seconds: 10),
-        action: SnackBarAction(
-          label: t.watchTogether.joinNow,
-          onPressed: () async {
-            final watchTogether = context.read<WatchTogetherProvider>();
-            await watchTogether.acceptInvitation(invitation);
-          },
-        ),
-      ),
-    );
+  void _showInvitationBanner(WatchInvitation invitation) {
+    setState(() {
+      _currentInvitation = invitation;
+    });
+  }
+
+  void _dismissInvitationBanner() {
+    setState(() {
+      _currentInvitation = null;
+    });
+  }
+
+  Future<void> _acceptInvitation() async {
+    final invitation = _currentInvitation;
+    if (invitation == null) return;
+
+    _dismissInvitationBanner();
+    final watchTogether = context.read<WatchTogetherProvider>();
+    await watchTogether.acceptInvitation(invitation);
+  }
+
+  void _declineInvitation() {
+    final invitation = _currentInvitation;
+    if (invitation == null) return;
+
+    _dismissInvitationBanner();
+    final watchTogether = context.read<WatchTogetherProvider>();
+    watchTogether.declineInvitation(invitation);
   }
 
   /// Set up Watch Next deep link handling for Android TV launcher taps
@@ -771,6 +790,18 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
                           ),
                         ),
                       ),
+                      // Invitation banner overlay
+                      if (_currentInvitation != null)
+                        Positioned(
+                          top: MediaQuery.of(context).padding.top + 16,
+                          left: contentLeftPadding + 16,
+                          right: 16,
+                          child: AnimatedInvitationBanner(
+                            invitation: _currentInvitation!,
+                            onAccept: _acceptInvitation,
+                            onDecline: _declineInvitation,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -782,7 +813,38 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
     }
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: Stack(
+        children: [
+          IndexedStack(index: _currentIndex, children: _screens),
+          // Invitation banner overlay for mobile
+          if (_currentInvitation != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              right: 16,
+              child: AnimatedInvitationBanner(
+                invitation: _currentInvitation!,
+                onAccept: _acceptInvitation,
+                onDecline: _declineInvitation,
+              ),
+            ),
+          // Pending invitations badge for mobile (navigate to Watch Together)
+          if (!_isOffline)
+            Positioned(
+              bottom: 80, // Above bottom navigation
+              right: 16,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WatchTogetherScreen()),
+                  );
+                },
+                child: const PendingInvitationsBadge(),
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _selectTab,
