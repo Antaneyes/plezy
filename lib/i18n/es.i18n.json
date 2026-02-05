@@ -622,6 +622,7 @@
         "invitesYouToWatch": "${name} te invita a ver",
         "joinNow": "Unirse Ahora",
         "decline": "Rechazar",
+        "accept": "Aceptar",
         "invitationPending": "Pendiente",
         "invitationAccepted": "Unido",
         "invitationDeclined": "Rechazado",

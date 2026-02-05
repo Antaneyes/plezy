@@ -7,6 +7,7 @@ import '../../i18n/strings.g.dart';
 import '../../models/plex_friend.dart';
 import '../../utils/app_logger.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
+import '../models/watch_invitation.dart';
 import '../models/watch_session.dart';
 import '../providers/watch_together_provider.dart';
 import '../widgets/friend_selection_sheet.dart';
@@ -76,52 +77,159 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final pendingInvitations = widget.watchTogether.pendingInvitations;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Symbols.group_rounded, size: 80, color: theme.colorScheme.primary),
-              const SizedBox(height: 24),
-              Text(t.watchTogether.title, style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                t.watchTogether.description,
-                style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  autofocus: true,
-                  onPressed: _isCreating || _isJoining ? null : _createSession,
-                  icon: _isCreating
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Symbols.add_rounded),
-                  label: Text(_isCreating ? t.watchTogether.creating : t.watchTogether.createSession),
+    return SingleChildScrollView(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Symbols.group_rounded, size: 80, color: theme.colorScheme.primary),
+                const SizedBox(height: 24),
+                Text(t.watchTogether.title, style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(
+                  t.watchTogether.description,
+                  style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isCreating || _isJoining ? null : _joinSession,
-                  icon: _isJoining
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Symbols.group_add_rounded),
-                  label: Text(_isJoining ? t.watchTogether.joining : t.watchTogether.joinSession),
+
+                // Pending invitations section
+                if (pendingInvitations.isNotEmpty) ...[
+                  const SizedBox(height: 32),
+                  _buildPendingInvitations(context, pendingInvitations),
+                ],
+
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    autofocus: pendingInvitations.isEmpty,
+                    onPressed: _isCreating || _isJoining ? null : _createSession,
+                    icon: _isCreating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Symbols.add_rounded),
+                    label: Text(_isCreating ? t.watchTogether.creating : t.watchTogether.createSession),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isCreating || _isJoining ? null : _joinSession,
+                    icon: _isJoining
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Symbols.group_add_rounded),
+                    label: Text(_isJoining ? t.watchTogether.joining : t.watchTogether.joinSession),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildPendingInvitations(BuildContext context, List<WatchInvitation> invitations) {
+    final theme = Theme.of(context);
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Symbols.mail_rounded, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(
+                  t.watchTogether.pendingInvitations,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...invitations.map((invitation) => _buildInvitationTile(context, invitation)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvitationTile(BuildContext context, WatchInvitation invitation) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+            child: Text(
+              invitation.hostDisplayName.isNotEmpty ? invitation.hostDisplayName[0].toUpperCase() : '?',
+              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  invitation.hostDisplayName,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  invitation.mediaTitle,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filled(
+            onPressed: () => _acceptInvitation(invitation),
+            icon: const Icon(Symbols.check_rounded),
+            tooltip: t.watchTogether.accept,
+          ),
+          const SizedBox(width: 4),
+          IconButton.outlined(
+            onPressed: () => _declineInvitation(invitation),
+            icon: const Icon(Symbols.close_rounded),
+            tooltip: t.watchTogether.decline,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _acceptInvitation(WatchInvitation invitation) async {
+    setState(() => _isJoining = true);
+    try {
+      await widget.watchTogether.acceptInvitation(invitation);
+    } catch (e) {
+      appLogger.e('Failed to accept invitation', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.watchTogether.failedToJoin}: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isJoining = false);
+      }
+    }
+  }
+
+  void _declineInvitation(WatchInvitation invitation) {
+    widget.watchTogether.declineInvitation(invitation);
   }
 
   Future<void> _createSession() async {

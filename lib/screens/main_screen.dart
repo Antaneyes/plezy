@@ -157,18 +157,23 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
 
   /// Helper to register the current user for Watch Together invitations
   void _registerWatchTogether() {
+    appLogger.d('WatchTogether: _registerWatchTogether called, isOffline=$_isOffline');
     if (_isOffline) return;
     try {
       final userProfile = context.read<UserProfileProvider>();
       final currentUser = userProfile.currentUser;
+      appLogger.d('WatchTogether: currentUser=${currentUser?.displayName ?? "null"}, uuid=${currentUser?.uuid ?? "null"}');
       if (currentUser != null) {
+        appLogger.d('WatchTogether: Calling registerForInvitations...');
         context.read<WatchTogetherProvider>().registerForInvitations(
               userUUID: currentUser.uuid,
               displayName: currentUser.displayName,
             );
+      } else {
+        appLogger.w('WatchTogether: Cannot register - currentUser is null');
       }
     } catch (e) {
-      appLogger.w('Failed to register for Watch Together invitations', error: e);
+      appLogger.e('WatchTogether: Failed to register for invitations', error: e);
     }
   }
 

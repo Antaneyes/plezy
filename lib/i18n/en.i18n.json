@@ -622,6 +622,7 @@
     "invitesYouToWatch": "${name} invites you to watch",
     "joinNow": "Join Now",
     "decline": "Decline",
+    "accept": "Accept",
     "invitationPending": "Pending",
     "invitationAccepted": "Joined",
     "invitationDeclined": "Declined",
