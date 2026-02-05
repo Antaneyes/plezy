@@ -40,6 +40,7 @@ import '../watch_together/watch_together.dart';
 import '../watch_together/models/watch_invitation.dart';
 import '../watch_together/widgets/invitation_banner.dart';
 import '../watch_together/widgets/invitations_indicator.dart';
+import '../models/plex_home_user.dart';
 
 /// Provides access to the main screen's focus control.
 class MainScreenFocusScope extends InheritedWidget {
@@ -106,6 +107,9 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
   // Current invitation to display as banner
   WatchInvitation? _currentInvitation;
 
+  // Listener for UserProfileProvider (used when currentUser is not immediately available)
+  VoidCallback? _userProfileListener;
+
   @override
   void initState() {
     super.initState();
@@ -164,16 +168,46 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
       final currentUser = userProfile.currentUser;
       appLogger.d('WatchTogether: currentUser=${currentUser?.displayName ?? "null"}, uuid=${currentUser?.uuid ?? "null"}');
       if (currentUser != null) {
-        appLogger.d('WatchTogether: Calling registerForInvitations...');
-        context.read<WatchTogetherProvider>().registerForInvitations(
-              userUUID: currentUser.uuid,
-              displayName: currentUser.displayName,
-            );
+        _doRegisterWatchTogether(currentUser);
       } else {
-        appLogger.w('WatchTogether: Cannot register - currentUser is null');
+        // currentUser not yet available (common on PC due to timing differences)
+        // Listen for changes and register when user becomes available
+        appLogger.d('WatchTogether: Waiting for currentUser...');
+        _userProfileListener = _createUserProfileListener();
+        userProfile.addListener(_userProfileListener!);
       }
     } catch (e) {
       appLogger.e('WatchTogether: Failed to register for invitations', error: e);
+    }
+  }
+
+  /// Creates a listener that registers for Watch Together when currentUser becomes available
+  VoidCallback _createUserProfileListener() {
+    return () {
+      final userProfile = context.read<UserProfileProvider>();
+      final currentUser = userProfile.currentUser;
+      if (currentUser != null) {
+        // Remove listener before registering to avoid duplicate calls
+        if (_userProfileListener != null) {
+          userProfile.removeListener(_userProfileListener!);
+          _userProfileListener = null;
+        }
+        _doRegisterWatchTogether(currentUser);
+      }
+    };
+  }
+
+  /// Performs the actual Watch Together registration
+  void _doRegisterWatchTogether(PlexHomeUser user) {
+    try {
+      appLogger.d('WatchTogether: Calling registerForInvitations for ${user.displayName}...');
+      context.read<WatchTogetherProvider>().registerForInvitations(
+            userUUID: user.uuid,
+            displayName: user.displayName,
+          );
+      appLogger.d('WatchTogether: Registered ${user.displayName}');
+    } catch (e) {
+      appLogger.e('WatchTogether: Registration failed', error: e);
     }
   }
 
@@ -416,6 +450,15 @@ class _MainScreenState extends State<MainScreen> with RouteAware, WindowListener
       windowManager.setPreventClose(false);
     }
     _offlineModeProvider?.removeListener(_handleOfflineStatusChanged);
+    // Clean up UserProfile listener if still attached
+    if (_userProfileListener != null) {
+      try {
+        context.read<UserProfileProvider>().removeListener(_userProfileListener!);
+      } catch (_) {
+        // Context may not be available during dispose
+      }
+      _userProfileListener = null;
+    }
     _sidebarFocusScope.dispose();
     _contentFocusScope.dispose();
     super.dispose();

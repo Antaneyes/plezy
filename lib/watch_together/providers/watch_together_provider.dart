@@ -141,8 +141,8 @@ class WatchTogetherProvider with ChangeNotifier {
         mediaTitle: mediaTitle,
       ).copyWith(state: SessionState.connected);
 
-      // Generate a random display name and add self to participants
-      _displayName = _generateDisplayName();
+      // Use registered Plex name if available, otherwise generate random name
+      _displayName = _registeredUserDisplayName ?? _generateDisplayName();
       _participants.add(Participant(peerId: _peerService!.myPeerId!, displayName: _displayName, isHost: true));
 
       _syncManager = WatchTogetherSyncManager(
@@ -191,8 +191,8 @@ class WatchTogetherProvider with ChangeNotifier {
       // Session will be fully configured when we receive sessionConfig from host
       _session = _session!.copyWith(state: SessionState.connected, hostPeerId: 'wt-${sessionId.toUpperCase()}');
 
-      // Generate a random display name for this session
-      _displayName = _generateDisplayName();
+      // Use registered Plex name if available, otherwise generate random name
+      _displayName = _registeredUserDisplayName ?? _generateDisplayName();
 
       _syncManager = WatchTogetherSyncManager(
         peerService: _peerService!,
