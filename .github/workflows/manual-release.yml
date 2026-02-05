@@ -58,13 +58,18 @@ jobs:
       if: always()
       run: rm -f android/app/upload-keystore.jks android/key.properties
 
-    - name: Upload Android APKs
+    - name: Upload Android APK arm64-v8a
       uses: actions/upload-artifact@v4
       with:
-        name: plezy-android-release
-        path: |
-          build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+        name: plezy-android-arm64-v8a
+        path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+        retention-days: 7
+
+    - name: Upload Android APK armeabi-v7a
+      uses: actions/upload-artifact@v4
+      with:
+        name: plezy-android-armeabi-v7a
+        path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
         retention-days: 7
 
   build-windows:
@@ -95,14 +100,19 @@ jobs:
     - name: Build Windows Release
       run: flutter build windows --release
 
-    - name: Create ZIP archive
-      run: |
-        Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath plezy-windows-x64.zip
-      shell: pwsh
+    - name: Build Windows Installer
+      run: .\windows\build-installer.ps1
 
-    - name: Upload Windows Build
+    - name: Upload Windows Portable (uncompressed)
       uses: actions/upload-artifact@v4
       with:
-        name: plezy-windows-x64-release
-        path: plezy-windows-x64.zip
+        name: plezy-windows-portable
+        path: build/windows/x64/runner/Release/
+        retention-days: 7
+
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: plezy-windows-installer
+        path: plezy-windows-installer.exe
         retention-days: 7
