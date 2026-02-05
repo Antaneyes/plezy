@@ -153,6 +153,13 @@ class WatchTogetherProvider with ChangeNotifier {
 
       _wireSyncStateChanges();
 
+      // Re-register for invitations on the new peer service connection
+      if (_registeredUserUUID != null) {
+        _peerService!.registerUser(_registeredUserUUID!);
+        _setupInvitationListeners();
+        appLogger.d('WatchTogether: Re-registered user $_registeredUserUUID after creating session');
+      }
+
       notifyListeners();
       appLogger.d('WatchTogether: Session created: $sessionId');
 
@@ -206,6 +213,13 @@ class WatchTogetherProvider with ChangeNotifier {
 
       // Announce join to other participants
       _syncManager!.announceJoin(_displayName);
+
+      // Re-register for invitations on the new peer service connection
+      if (_registeredUserUUID != null) {
+        _peerService!.registerUser(_registeredUserUUID!);
+        _setupInvitationListeners();
+        appLogger.d('WatchTogether: Re-registered user $_registeredUserUUID after joining session');
+      }
 
       notifyListeners();
       appLogger.d('WatchTogether: Joined session successfully');
