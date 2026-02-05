@@ -1,34 +1,34 @@
-name: Manual Release APK (Signed)
+name: Manual Release (APK + Windows)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-        
+
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
         cache: true
-        
+
     - name: Get dependencies
       run: flutter pub get
-      
+
     - name: Run build_runner
       run: dart run build_runner build --delete-conflicting-outputs
-      
+
     - name: Configure Android signing
       env:
         KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -36,7 +36,7 @@ jobs:
         # Escribir el secreto a un archivo temporal para evitar problemas de pipe
         echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '[:space:]' > keystore.base64
         base64 -d keystore.base64 > android/app/upload-keystore.jks
-        
+
         # Crear el archivo key.properties
         cat > android/key.properties << EOF
         storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -44,22 +44,59 @@ jobs:
         keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
         storeFile=upload-keystore.jks
         EOF
-        
+
         # Limpiar
         rm keystore.base64
 
     - name: Build APK Release
       run: flutter build apk --release --split-per-abi
-      
+
     - name: Clean up keystore
       if: always()
       run: rm -f android/app/upload-keystore.jks android/key.properties
 
-    - name: Upload v7a and v8a APKs
+    - name: Upload Android APKs
       uses: actions/upload-artifact@v4
       with:
-        name: plezy-release-signed
+        name: plezy-android-release
         path: |
           build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+        retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+        cache: true
+
+    - name: Enable Windows desktop
+      run: flutter config --enable-windows-desktop
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Run build_runner
+      run: dart run build_runner build --delete-conflicting-outputs
+
+    - name: Build Windows Release
+      run: flutter build windows --release
+
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath plezy-windows-x64.zip
+      shell: pwsh
+
+    - name: Upload Windows Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: plezy-windows-x64-release
+        path: plezy-windows-x64.zip
         retention-days: 7

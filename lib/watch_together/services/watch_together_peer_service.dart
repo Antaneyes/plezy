@@ -395,6 +395,9 @@ class WatchTogetherPeerService {
   ///
   /// Returns the session ID that others can use to join.
   Future<String> createSession() async {
+    // Save registered user UUID to re-register after connecting
+    final savedUserUUID = _registeredUserUUID;
+
     if (_channel != null) {
       await disconnect();
     }
@@ -421,6 +424,13 @@ class WatchTogetherPeerService {
         },
       );
 
+      // Re-register for invitations if was previously registered
+      if (savedUserUUID != null) {
+        _registeredUserUUID = savedUserUUID;
+        _sendRaw({'type': 'register', 'userUUID': savedUserUUID});
+        appLogger.d('WatchTogether: Re-registered user $savedUserUUID after creating session');
+      }
+
       appLogger.d('WatchTogether: Session created: $_sessionId');
       return _sessionId!;
     } catch (e) {
@@ -432,6 +442,9 @@ class WatchTogetherPeerService {
 
   /// Join an existing session as guest.
   Future<void> joinSession(String sessionId) async {
+    // Save registered user UUID to re-register after connecting
+    final savedUserUUID = _registeredUserUUID;
+
     if (_channel != null) {
       await disconnect();
     }
@@ -457,6 +470,13 @@ class WatchTogetherPeerService {
           throw const PeerError(type: PeerErrorType.timeout, message: 'Timed out joining session');
         },
       );
+
+      // Re-register for invitations if was previously registered
+      if (savedUserUUID != null) {
+        _registeredUserUUID = savedUserUUID;
+        _sendRaw({'type': 'register', 'userUUID': savedUserUUID});
+        appLogger.d('WatchTogether: Re-registered user $savedUserUUID after joining session');
+      }
 
       appLogger.d('WatchTogether: Joined session: $_sessionId');
     } catch (e) {
