@@ -14,6 +14,7 @@ Future<bool> showDeleteConfirmation(BuildContext context, {required String title
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.common.cancel)),
         TextButton(
+          autofocus: true,
           onPressed: () => Navigator.pop(context, true),
           style: TextButton.styleFrom(foregroundColor: Colors.red),
           child: Text(t.common.delete),

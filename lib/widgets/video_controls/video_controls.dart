@@ -43,6 +43,7 @@ import '../../i18n/strings.g.dart';
 import '../../focus/input_mode_tracker.dart';
 import 'widgets/track_chapter_controls.dart';
 import 'widgets/performance_overlay/performance_overlay.dart';
+import 'widgets/volume_indicator.dart';
 import 'mobile_video_controls.dart';
 import 'desktop_video_controls.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,7 @@ import 'package:provider/provider.dart';
 import '../../models/shader_preset.dart';
 import '../../providers/shader_provider.dart';
 import '../../services/shader_service.dart';
+import '../../services/volume_button_service.dart';
 
 /// Custom video controls builder for Plex with chapter, audio, and subtitle support
 Widget plexVideoControlsBuilder(
@@ -224,6 +226,11 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
   // PiP support
   bool _isPipSupported = false;
   final PipService _pipService = PipService();
+  // Volume button service (Android hardware buttons)
+  int _maxVolume = 100;
+  // Volume indicator overlay
+  bool _showVolumeIndicator = false;
+  Timer? _volumeIndicatorTimer;
 
   @override
   void initState() {
@@ -260,6 +267,44 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     // Listen for first frame to start auto-hide timer
     widget.hasFirstFrame?.addListener(_onFirstFrameReady);
+    // Setup volume button service for Android hardware buttons
+    _setupVolumeButtonService();
+  }
+
+  /// Setup volume button interception for Android hardware buttons
+  void _setupVolumeButtonService() {
+    if (!Platform.isAndroid) return;
+    VolumeButtonService.init();
+    VolumeButtonService.onVolumeUp = () => _adjustVolumeFromHardware(5);
+    VolumeButtonService.onVolumeDown = () => _adjustVolumeFromHardware(-5);
+    VolumeButtonService.setInterceptionEnabled(true);
+  }
+
+  /// Adjust volume from hardware button press
+  Future<void> _adjustVolumeFromHardware(double delta) async {
+    final currentVolume = widget.player.state.volume;
+    final newVolume = (currentVolume + delta).clamp(0.0, _maxVolume.toDouble());
+    widget.player.setVolume(newVolume);
+    final settings = await SettingsService.getInstance();
+    await settings.setVolume(newVolume);
+
+    // Show volume indicator overlay
+    _showVolumeIndicatorOverlay();
+  }
+
+  /// Show volume indicator overlay and auto-hide after 2 seconds
+  void _showVolumeIndicatorOverlay() {
+    _volumeIndicatorTimer?.cancel();
+    setState(() {
+      _showVolumeIndicator = true;
+    });
+    _volumeIndicatorTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showVolumeIndicator = false;
+        });
+      }
+    });
   }
 
   /// Called when hasFirstFrame changes - start auto-hide timer when first frame is ready
@@ -441,6 +486,7 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
         _videoPlayerNavigationEnabled = settingsService.getVideoPlayerNavigationEnabled();
         _showPerformanceOverlay = settingsService.getShowPerformanceOverlay();
         _clickVideoTogglesPlayback = settingsService.getClickVideoTogglesPlayback();
+        _maxVolume = settingsService.getMaxVolume();
       });
 
       // Focus play/pause if navigation is now enabled and controls are visible
@@ -520,6 +566,7 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
     _feedbackTimer?.cancel();
     _autoSkipTimer?.cancel();
     _singleTapTimer?.cancel();
+    _volumeIndicatorTimer?.cancel();
     _seekThrottle.cancel();
     _playingSubscription?.cancel();
     _completedSubscription?.cancel();
@@ -534,6 +581,12 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
     // Remove window listener
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       windowManager.removeListener(this);
+    }
+    // Cleanup volume button service
+    if (Platform.isAndroid) {
+      VolumeButtonService.onVolumeUp = null;
+      VolumeButtonService.onVolumeDown = null;
+      VolumeButtonService.setInterceptionEnabled(false);
     }
     super.dispose();
   }
@@ -1459,8 +1512,9 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
             }
 
             // Handle Select/Enter when controls are hidden: pause and show controls
-            // Only intercept if this Focus node itself has primary focus (not a descendant)
-            if (_isSelectKey(key) && !_showControls && _focusNode.hasPrimaryFocus) {
+            // In TV mode, SELECT should always show controls when hidden (no focus restriction)
+            // This ensures controls are accessible even when focus is elsewhere (e.g., Watch Together indicator)
+            if (_isSelectKey(key) && !_showControls) {
               widget.player.playOrPause();
               _showControlsWithFocus();
               return KeyEventResult.handled;
@@ -1748,6 +1802,16 @@ class _PlexVideoControlsState extends State<PlexVideoControls> with WindowListen
                     ),
                   // Speed indicator overlay for long-press 2x
                   if (_showSpeedIndicator) Positioned.fill(child: IgnorePointer(child: _buildSpeedIndicator())),
+                  // Volume indicator overlay for hardware buttons
+                  if (_showVolumeIndicator)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: VolumeIndicator(
+                          volume: widget.player.state.volume,
+                          maxVolume: _maxVolume,
+                        ),
+                      ),
+                    ),
                   // Skip intro/credits button
                   if (_currentMarker != null)
                     AnimatedPositioned(

@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
+import '../../focus/focusable_wrapper.dart';
 import '../../i18n/strings.g.dart';
 import '../../models/plex_friend.dart';
 import '../../utils/app_logger.dart';
+import '../../utils/platform_detector.dart';
 import '../../widgets/focused_scroll_scaffold.dart';
 import '../models/watch_invitation.dart';
 import '../models/watch_session.dart';
@@ -73,6 +75,19 @@ class _NotInSessionView extends StatefulWidget {
 class _NotInSessionViewState extends State<_NotInSessionView> {
   bool _isCreating = false;
   bool _isJoining = false;
+  FocusNode? _firstInvitationFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstInvitationFocusNode = FocusNode(debugLabel: 'FirstInvitationAccept');
+  }
+
+  @override
+  void dispose() {
+    _firstInvitationFocusNode?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,14 +171,14 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
               ],
             ),
             const SizedBox(height: 12),
-            ...invitations.map((invitation) => _buildInvitationTile(context, invitation)),
+            ...invitations.asMap().entries.map((e) => _buildInvitationTile(context, e.value, e.key)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInvitationTile(BuildContext context, WatchInvitation invitation) {
+  Widget _buildInvitationTile(BuildContext context, WatchInvitation invitation, int index) {
     final theme = Theme.of(context);
 
     return Padding(
@@ -196,16 +211,26 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
             ),
           ),
           const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: () => _acceptInvitation(invitation),
-            icon: const Icon(Symbols.check_rounded),
-            tooltip: t.watchTogether.accept,
+          FocusableWrapper(
+            focusNode: index == 0 ? _firstInvitationFocusNode : null,
+            autofocus: index == 0,
+            onSelect: () => _acceptInvitation(invitation),
+            borderRadius: 20.0,
+            child: IconButton.filled(
+              onPressed: () => _acceptInvitation(invitation),
+              icon: const Icon(Symbols.check_rounded),
+              tooltip: t.watchTogether.accept,
+            ),
           ),
           const SizedBox(width: 4),
-          IconButton.outlined(
-            onPressed: () => _declineInvitation(invitation),
-            icon: const Icon(Symbols.close_rounded),
-            tooltip: t.watchTogether.decline,
+          FocusableWrapper(
+            onSelect: () => _declineInvitation(invitation),
+            borderRadius: 20.0,
+            child: IconButton.outlined(
+              onPressed: () => _declineInvitation(invitation),
+              icon: const Icon(Symbols.close_rounded),
+              tooltip: t.watchTogether.decline,
+            ),
           ),
         ],
       ),
@@ -288,6 +313,7 @@ class _NotInSessionViewState extends State<_NotInSessionView> {
             child: Text(t.watchTogether.hostOnly),
           ),
           FilledButton(
+            autofocus: true,
             onPressed: () => Navigator.pop(context, ControlMode.anyone),
             child: Text(t.watchTogether.anyone),
           ),
@@ -570,6 +596,7 @@ class _ActiveSessionContent extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.common.cancel)),
           FilledButton(
+            autofocus: true,
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             child: Text(watchTogether.isHost ? t.watchTogether.end : t.watchTogether.leave),
@@ -594,24 +621,27 @@ class _SessionCodeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return InkWell(
-      onTap: () => _copySessionCode(context),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${t.watchTogether.sessionCode}: $sessionId',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
-                color: theme.colorScheme.onSurfaceVariant,
+    return ExcludeFocus(
+      excluding: PlatformDetector.isTV(),
+      child: InkWell(
+        onTap: () => _copySessionCode(context),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${t.watchTogether.sessionCode}: $sessionId',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Symbols.content_copy_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
-          ],
+              const SizedBox(width: 4),
+              Icon(Symbols.content_copy_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

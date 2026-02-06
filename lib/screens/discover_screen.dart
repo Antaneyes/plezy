@@ -795,7 +795,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         content: Text(t.messages.logoutConfirm),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.common.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(t.common.logout)),
+          FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: Text(t.common.logout)),
         ],
       ),
     );

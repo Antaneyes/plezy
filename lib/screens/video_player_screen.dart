@@ -1100,6 +1100,7 @@ class VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindin
             actions: [
               TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
               FilledButton(
+                autofocus: true,
                 onPressed: () => Navigator.pop(dialogContext, true),
                 style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
                 child: const Text('Leave'),

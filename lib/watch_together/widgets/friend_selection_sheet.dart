@@ -1,11 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
+import '../../focus/dpad_navigator.dart';
 import '../../i18n/strings.g.dart';
 import '../../models/plex_friend.dart';
 import '../../providers/friends_provider.dart';
+import '../../widgets/focusable_bottom_sheet.dart';
+import '../../widgets/focusable_list_tile.dart';
 
 /// Bottom sheet for selecting friends to invite to a Watch Together session
 class FriendSelectionSheet extends StatefulWidget {
@@ -24,10 +28,12 @@ class _FriendSelectionSheetState extends State<FriendSelectionSheet> {
   final _searchController = TextEditingController();
   final Set<String> _selectedFriendUUIDs = {};
   String _searchQuery = '';
+  late final FocusNode _initialFocusNode;
 
   @override
   void initState() {
     super.initState();
+    _initialFocusNode = FocusNode(debugLabel: 'FriendSelectionSheetInitialFocus');
     // Load friends when sheet opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FriendsProvider>().loadFriends();
@@ -37,14 +43,26 @@ class _FriendSelectionSheetState extends State<FriendSelectionSheet> {
   @override
   void dispose() {
     _searchController.dispose();
+    _initialFocusNode.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _handleSearchKeyEvent(FocusNode node, KeyEvent event) {
+    if (!event.isActionable) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _initialFocusNode.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return DraggableScrollableSheet(
+    return FocusableBottomSheet(
+      initialFocusNode: _initialFocusNode,
+      child: DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
       maxChildSize: 0.95,
@@ -92,24 +110,27 @@ class _FriendSelectionSheetState extends State<FriendSelectionSheet> {
                 // Search bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: t.watchTogether.searchFriends,
-                      prefixIcon: const Icon(Symbols.search),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Symbols.close),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                          : null,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Focus(
+                    onKeyEvent: _handleSearchKeyEvent,
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: t.watchTogether.searchFriends,
+                        prefixIcon: const Icon(Symbols.search),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Symbols.close),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onChanged: (value) => setState(() => _searchQuery = value),
                     ),
-                    onChanged: (value) => setState(() => _searchQuery = value),
                   ),
                 ),
 
@@ -153,6 +174,7 @@ class _FriendSelectionSheetState extends State<FriendSelectionSheet> {
           },
         );
       },
+      ),
     );
   }
 
@@ -215,7 +237,9 @@ class _FriendSelectionSheetState extends State<FriendSelectionSheet> {
         final friend = friends[index];
         final isSelected = _selectedFriendUUIDs.contains(friend.uuid);
 
-        return ListTile(
+        return FocusableListTile(
+          focusNode: index == 0 ? _initialFocusNode : null,
+          autofocus: index == 0,
           leading: CircleAvatar(
             backgroundImage: friend.thumb.isNotEmpty ? CachedNetworkImageProvider(friend.thumb) : null,
             child: friend.thumb.isEmpty ? Text(friend.displayName[0].toUpperCase()) : null,

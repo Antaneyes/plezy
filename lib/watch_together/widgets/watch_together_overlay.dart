@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../i18n/strings.g.dart';
+import '../../utils/platform_detector.dart';
 import '../../utils/snackbar_helper.dart';
 import '../models/watch_session.dart';
 import '../providers/watch_together_provider.dart';
@@ -72,10 +73,12 @@ class _SessionIndicator extends StatelessWidget {
     return Material(
       color: Colors.black54,
       borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
+      child: ExcludeFocus(
+        excluding: PlatformDetector.isTV(),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -112,6 +115,7 @@ class _SessionIndicator extends StatelessWidget {
               ],
             ],
           ),
+        ),
         ),
       ),
     );
@@ -270,6 +274,7 @@ class _SessionMenuSheet extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text(t.common.cancel)),
           FilledButton(
+            autofocus: true,
             onPressed: () {
               Navigator.pop(context);
               provider.leaveSession();
